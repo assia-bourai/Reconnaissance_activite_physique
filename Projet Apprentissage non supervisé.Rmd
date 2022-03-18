@@ -1,0 +1,699 @@
+---
+title: "R Notebook Projet Apprentissage NonSupervisé"
+output: html_notebook
+
+
+---
+
+
+M2 AMSD
+
+Assia BOURAÏ
+
+
+--- 
+Importation des librairies
+---
+```{r}
+library(Hmisc)
+library(ggplot2)
+library(dplyr)
+library(Rtsne)
+library(cluster)
+library(scatterplot3d)
+library(dplyr)
+library(aricode)
+library(RclusTool)
+library(caret)
+library(clusterSim)
+library(kernlab)
+library(fpc)
+library(anocva)
+library(apcluster)
+library("factoextra")
+library("FactoMineR")
+library(TSdist)
+library(TSclust)
+library(cluster)
+library(dtwclust)
+library(plyr)
+library(ggplot2)
+library(reshape2)
+```
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Importation des données et création du dataset
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+```{r}
+accm_x=read.table("http://allousame.free.fr/mlds/tp/accm_x.txt")
+accm_x
+```
+```{r}
+accm_y=read.table("http://allousame.free.fr/mlds/tp/accm_y.txt")
+accm_y
+```
+```{r}
+accm_z=read.table("http://allousame.free.fr/mlds/tp/accm_z.txt")
+accm_z
+```
+```{r}
+acce_x=read.table("http://allousame.free.fr/mlds/tp/acce_x.txt")
+acce_x
+```
+```{r}
+acce_y=read.table("http://allousame.free.fr/mlds/tp/acce_y.txt")
+acce_y
+```
+```{r}
+acce_z=read.table("http://allousame.free.fr/mlds/tp/accm_z.txt")
+acce_z
+```
+```{r}
+vit_x=read.table("http://allousame.free.fr/mlds/tp/vit_x.txt")
+vit_x
+```
+```{r}
+vit_y=read.table("http://allousame.free.fr/mlds/tp/vit_y.txt")
+vit_y
+```
+```{r}
+vit_z=read.table("http://allousame.free.fr/mlds/tp/vit_z.txt")
+vit_z
+
+```
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Concaténation des différents datasets
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+```{r}
+data = cbind(accm_x,accm_y,accm_z,acce_x,acce_y,acce_z,vit_x,vit_y,vit_z)
+
+for (i in 1:1152 ){
+  names(data)[i] <- paste("V",i)
+}
+data
+
+
+```
+```{r}
+labels=read.table("http://allousame.free.fr/mlds/tp/lab.txt")
+names(labels) = c("label")
+labels = as.data.frame(labels)
+```
+```{r}
+unique(labels$label) 
+```
+
+```{r}
+describe(labels)
+```
+```{r}
+labels <-labels %>% 
+  mutate(class=case_when(
+    label==1 ~ 'marcher',
+    label==2 ~ 'monter',
+    label==3 ~ 'descendre',
+    label==4 ~ 'assis',
+    label==5 ~ 'se lever',
+    label==6 ~ 'allonger'
+  ))
+
+
+b<-barplot(table(labels$class),col= c("green","red","black","blue", "yellow","brown"),
+           ylim=c(0,150), cex.names=0.8, space=02)
+text(b, table(labels$class)+50, table(labels$class))
+
+
+```
+
+
+```{r}
+labels=read.table("http://allousame.free.fr/mlds/tp/lab.txt")
+names(labels) = c("label")
+labels = as.data.frame(labels)
+```
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Analyse en Composantes Principales
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+```{r}
+#Analyse en composantes principales
+ACP = prcomp(data,scale = TRUE)
+summary(ACP)
+```
+
+
+```{r}
+#Valeurs propres
+eig.val <- get_eigenvalue(ACP)
+eig.val
+```
+
+```{r}
+ncp = min(which(eig.val[,3]>=90))
+ncp
+```
+```{r}
+fviz_eig(ACP, addlabels = TRUE, ylim = c(0, 50))
+```
+```{r}
+#Visualisation
+fviz_pca_var(ACP, col.var = "cos2",
+             repel = FALSE 
+             )
+```
+```{r}
+ind <- get_pca_ind(ACP)
+fviz_pca_ind (ACP, col.ind = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = FALSE # Évite le chevauchement de texte
+             )
+```
+
+
+```{r}
+#Sélection des 58 dimensions
+ACP=ACP$x[,1:58]
+
+```
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Clustering Hiérarchique sur les données d'origine
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+```{r}
+HW1 = hclust(dist(data),method="ward.D2")
+
+```
+
+```{r}
+plot(HW1,hang=-1)
+
+```
+
+```{r}
+plot(rev(HW1$height),type="h",xlim=c(0,20),ylab="",xlab="nombre de classes")
+
+```
+
+```{r}
+pred_labels<-cutree(HW1, k=6)
+plot(ACP, col = pred_labels,pch=16,cex=1.2,main="Distribution des clusters sur l'espace réduit")
+legend(x="topright", legend=unique(pred_labels), col=unique(pred_labels), pch=16,bg="white")
+```
+
+```{r}
+confusionMatrix(factor(y),factor(pred_labels))
+NMI(pred_labels,y)
+```
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Clustering Hiérarchique sur l'espace de réduction PCA
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+```{r}
+HW = hclust(dist(ACP),method="ward.D2")
+
+#Dendrogramme
+plot(HW,hang=-1)
+```
+```{r}
+plot(rev(HW$height),type="h",xlim=c(0,20),ylab="",xlab="nombre de classes")
+```
+```{r}
+#Coupe de l'arbre
+pred_labelspca<-cutree(HW, k=6)
+#Visualisation sur l'espace réduit
+plot(ACP, col = pred_labelspca,pch=16,cex=1.2,main="Distribution des clusters sur l'espace réduit")
+legend(x="topright", legend=unique(pred_labelspca), col=unique(pred_labelspca), pch=16,bg="white")
+```
+```{r}
+confusionMatrix(factor(y),factor(pred_labelspca))
+NMI(pred_labelspca,y)
+```
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Clustering KMeans sur les données d'origine
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+```{r}
+set.seed(132)
+
+```
+
+```{r}
+#K optimal
+fviz_nbclust(data, FUNcluster=kmeans, method="wss")+theme_classic()
+```
+```{r}
+fviz_nbclust(data, FUNcluster=kmeans, method="gap_stat")+theme_classic()
+
+```
+```{r}
+fviz_nbclust(data, FUNcluster=kmeans, method="silhouette")+theme_classic()
+
+```
+
+
+```{r}
+km_original = kmeans(data,6,iter.max = 50,nstart=50)
+
+### confusion matrix for best result
+
+print("CONFUSION MATRIX WITH ORIGINAL DATA")
+confusionMatrix(factor(labels$label),factor(km_original$cluster))
+print("NMI FOR KMEANS WITH ORIGINAL DATA")
+NMI(km_original$cluster,labels$label)
+print("ARI FOR KMEANS WITH ORIGINAL DATA")
+ARI(km_original$cluster,labels$label)
+```
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+                                                       Kmeans sur l'espace réduit PCA
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+```{r}
+######################With PCA dimensionality reduction#######################"
+km = kmeans(PCA,6,iter.max = 50,nstart=50)
+
+
+### confusion matrix for best result
+print("CONFUSION MATRIX WITH PCA DIMENSIONALITY")
+confusionMatrix(factor(labels$label),factor(km$cluster))
+print("NMI FOR KMEANS WITH PCA DIMENSIONALITY")
+NMI(km$cluster,labels$label)
+print("ARI FOR KMEANS WITH PCA DIMENSIONALITY")
+ARI(km$cluster,labels$label)
+
+```
+
+```{r}
+plot(ACP, col = km$cluster,pch=16,cex=1.2,main="Distribution des clusters sur l'espace réduit")
+legend(x="topright", legend=unique(km$cluster), col=unique(km$cluster), pch=16,bg="white")
+```
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Spectral clustering sur PCA
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+```{r}
+sc_pca=spectralClustering(corSimMat(ACP, sel=NA, r=1, signed=TRUE, method="pearson"),6)
+print("CONFUSION MATRIX WITH PCA")
+confusionMatrix(table(sc_pca,labels$label))
+print("NMI FOR SPECTRAL CLUSTERING WITH PCA")
+NMI(sc_pca,labels$label)
+print("ARI FOR SPECTRAL CLUSTERING WITH PCA ")
+ARI(sc_pca,labels$label)
+
+```
+
+```{r}
+plot(ACP, col =sc_pca,pch=16,cex=1.2,main="Distribution des clusters sur l'espace réduit")
+legend(x="topright", legend=unique(sc_pca), col=unique(sc_pca), pch=16,bg="white")
+```
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+                                                        Réduction de la dimension en utilisant TSNE 
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+```{r}
+#tsne
+tsne <- Rtsne(data, dims = 2, perplexity=50, verbose=TRUE, max_iter = 2500)
+
+
+####tsne 2D visualization####
+tnse_df = as.data.frame(tsne$Y)
+tnse_df = cbind(tnse_df,labels)
+names(tnse_df) = c("c1", "c2", "lab")
+ggplot(tnse_df, aes(c1, y=c2, color=as.factor(labels$class)) ) + geom_point()
+
+
+
+
+####tsne 3D visualization##
+tsne_3D <- Rtsne(data, dims = 3, perplexity=30, verbose=TRUE, max_iter = 1500)
+colors = c("red","green","blue", "orange", "brown", "purple")
+scatterplot3d(x=tsne_3D$Y[,1],y=tsne_3D$Y[,2],z=tsne_3D$Y[,3])
+
+```
+
+
+
+```{r}
+set.seed(132)
+######################With TSNE dimensionality reduction#######################"
+km_tsne = kmeans(tsne$Y,6,iter.max = 50,nstart=50)
+print("CONFUSION MATRIX WITH TSNE")
+confusionMatrix(factor(labels$label),factor(km_tsne$cluster))
+print("NMI FOR KMEANS WITH TSNE")
+NMI(km_tsne$cluster,labels$label)
+print("ARI FOR KMEANS WITH TSNE")
+ARI(km_tsne$cluster,labels$label)
+
+
+```
+```{r}
+plot(tnse_df$c2,tnse_df$c1, col =km_tsne$cluster,pch=16,cex=1.2,main="Distribution des clusters sur l'espace réduit")
+legend(x="topright", legend=unique(km_tsne$cluster), col=unique(km_tsne$cluster), pch=16,bg="white")
+```
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Spectral clustering sur TSNE
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+```{r}
+sc_tsne=spectralClustering(expSimMat(tsne$Y, sel=NA, r=2, w=1, method="euclidean", p=2), 6)
+print("CONFUSION MATRIX WITH TSNE")
+#table(sc,labels$label)
+confusionMatrix(table(sc_tsne,labels$label))
+print("NMI FOR SPECTRAL CLUSTERING WITH TSNE")
+NMI(sc_tsne,labels$label)
+print("ARI FOR SPECTRAL CLUSTERING WITH TSNE ")
+ARI(sc_tsne,labels$label)
+
+```
+
+
+```{r}
+plot(tnse_df$c2,tnse_df$c1, col =sc_tsne,pch=16,cex=1.2,main="Distribution des clusters sur l'espace réduit")
+legend(x="topright", legend=unique(sc_tsne), col=unique(sc_tsne), pch=16,bg="white")
+```
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Clustering using DBSCAN sur TSNE
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+```{r}
+###################### With TSNE dimensionality reduction #######################
+db_tsne <- dbscan(tsne$Y, eps = 2, MinPts = 20)
+print("NMI FOR DBSCAN WITH TSNE")
+NMI(db_tsne$cluster,labels$label)
+print("ARI FOR DBSCAN WITH TSNE")
+ARI(db_tsne$cluster,labels$label)
+plot(tsne$Y,col=db_tsne$cluster)
+
+```
+
+```{r}
+plot(tnse_df$c2,tnse_df$c1, col =db_tsne$cluster,pch=16,cex=1.2,main="Distribution des clusters sur l'espace réduit")
+legend(x="topright", legend=unique(db_tsne$cluster), col=unique(db_tsne$cluster), pch=16,bg="white")
+```
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Clustering hiérarchique sur TSNE
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+```{r}
+# Matrice des distances
+D <- dist(tsne$Y, method = "euclidean")
+# Mise en oeuvre de l'algorithme
+H <- hclust(D, method="ward.D")
+classes <- cutree(H,k=6)
+#vec_pred = as.vector(as.matrix(classes))
+#vec_lab = as.vector(as.matrix(labels$label))
+print("NMI FOR CAH WITH TSNE")
+NMI(classes,labels$label)
+print("ARI FOR CAH WITH TSNE")
+ARI(classes,labels$label)
+
+# Représentation graphique (dendrogramme)
+plot(as.hclust(H),hang=-1)
+```
+```{r}
+plot(tnse_df$c2,tnse_df$c1, col =classes,pch=16,cex=1.2,main="Distribution des clusters sur l'espace réduit")
+legend(x="topright", legend=unique(classes), col=unique(classes), pch=16,bg="white")
+```
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+KMedoids with DTW distance
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+```{r}
+ts_xacce = as.ts(t(x_acce))
+ts_yacce = as.ts(t(y_acce))
+ts_zacce = as.ts(t(z_acce))
+ts_xaccm = as.ts(t(x_accm))
+ts_yaccm = as.ts(t(y_accm))
+ts_zaccm = as.ts(t(z_accm))
+ts_xvit = as.ts(t(x_vit))
+ts_yvit = as.ts(t(y_vit))
+ts_zvit = as.ts(t(z_vit))
+```
+
+
+```{r}
+plot(seq(1:ncol(m_xacce)), m_xacce[1,], type = "l")
+```
+
+
+```{r}
+
+# KMedoids with DTW distance
+
+ar1 = array(c(as.matrix(x_acce), as.matrix(y_acce), as.matrix(z_acce)), c(347, 128, 6))
+
+listar1 = alply(ar1,1)
+clustFinal = tsclust(listar1, k=6, centroid="pam", control = partitional_control(nrep = 10L))
+sapply(clustFinal, cvi, b = labels)
+```
+
+```{r}
+NMI(factor(labels), factor(clustFinal[[8]]@cluster))
+```
+
+```{r}
+
+# Clusters prédits
+pred_labels = clustFinal[[8]]@cluster
+
+# graphs pour le cluster 1
+index_pred_1 = which(pred_labels %in% 1)
+mean_xacce_1 = mean(as.vector(ts_xacce[,index_pred_1]))
+mean_yacce_1 = mean(as.vector(ts_yacce[,index_pred_1]))
+mean_zacce_1 = mean(as.vector(ts_zacce[,index_pred_1]))
+
+mean_xvit_1 = mean(as.vector(ts_xvit[,index_pred_1]))
+mean_yvit_1 = mean(as.vector(ts_yvit[,index_pred_1]))
+mean_zvit_1 = mean(as.vector(ts_zvit[,index_pred_1]))
+
+# graphs pour le cluster 2
+index_pred_2 = which(pred_labels %in% 2)
+mean_xacce_2 = mean(as.vector(ts_xacce[,index_pred_2]))
+mean_yacce_2 = mean(as.vector(ts_yacce[,index_pred_2]))
+mean_zacce_2 = mean(as.vector(ts_zacce[,index_pred_2]))
+
+mean_xvit_2 = mean(as.vector(ts_xvit[,index_pred_2]))
+mean_yvit_2 = mean(as.vector(ts_yvit[,index_pred_2]))
+mean_zvit_2 = mean(as.vector(ts_zvit[,index_pred_2]))
+
+# graphs pour le cluster 3
+index_pred_3 = which(pred_labels %in% 3)
+mean_xacce_3 = mean(as.vector(ts_xacce[,index_pred_3]))
+mean_yacce_3 = mean(as.vector(ts_yacce[,index_pred_3]))
+mean_zacce_3 = mean(as.vector(ts_zacce[,index_pred_3]))
+
+mean_xvit_3 = mean(as.vector(ts_xvit[,index_pred_3]))
+mean_yvit_3 = mean(as.vector(ts_yvit[,index_pred_3]))
+mean_zvit_3 = mean(as.vector(ts_zvit[,index_pred_3]))
+
+# graphs po4r le cluster 4
+index_pred_4 = which(pred_labels %in% 4)
+mean_xacce_4 = mean(as.vector(ts_xacce[,index_pred_4]))
+mean_yacce_4 = mean(as.vector(ts_yacce[,index_pred_4]))
+mean_zacce_4 = mean(as.vector(ts_zacce[,index_pred_4]))
+
+mean_xvit_4 = mean(as.vector(ts_xvit[,index_pred_4]))
+mean_yvit_4 = mean(as.vector(ts_yvit[,index_pred_4]))
+mean_zvit_4 = mean(as.vector(ts_zvit[,index_pred_4]))
+
+# graphs pour le cluster 5
+index_pred_5 = which(pred_labels %in% 5)
+mean_xacce_5 = mean(as.vector(ts_xacce[,index_pred_5]))
+mean_yacce_5 = mean(as.vector(ts_yacce[,index_pred_5]))
+mean_zacce_5 = mean(as.vector(ts_zacce[,index_pred_5]))
+
+mean_xvit_5 = mean(as.vector(ts_xvit[,index_pred_5]))
+mean_yvit_5 = mean(as.vector(ts_yvit[,index_pred_5]))
+mean_zvit_5 = mean(as.vector(ts_zvit[,index_pred_5]))
+
+# graphs pour le cluster 6
+index_pred_6 = which(pred_labels %in% 6)
+mean_xacce_6 = mean(as.vector(ts_xacce[,index_pred_6]))
+mean_yacce_6 = mean(as.vector(ts_yacce[,index_pred_6]))
+mean_zacce_6 = mean(as.vector(ts_zacce[,index_pred_6]))
+
+mean_xvit_6 = mean(as.vector(ts_xvit[,index_pred_6]))
+mean_yvit_6 = mean(as.vector(ts_yvit[,index_pred_6]))
+mean_zvit_6 = mean(as.vector(ts_zvit[,index_pred_6]))
+
+```
+
+```{r, fig.width = 15, fig.height=6}
+library(ggplot2)
+library(reshape2)
+
+list_mean_xacce = c(mean_xacce_1, mean_xacce_2, mean_xacce_3, mean_xacce_4, mean_xacce_5, mean_xacce_6)
+list_mean_yacce = c(mean_yacce_1, mean_yacce_2, mean_yacce_3, mean_yacce_4, mean_yacce_5, mean_yacce_6)
+list_mean_zacce = c(mean_zacce_1, mean_zacce_2, mean_zacce_3, mean_zacce_4, mean_zacce_5, mean_zacce_6)
+list_mean_xvit = c(mean_xvit_1, mean_xvit_2, mean_xvit_3, mean_xvit_4, mean_xvit_5, mean_xvit_6)
+list_mean_yvit = c(mean_yvit_1, mean_yvit_2, mean_yvit_3, mean_yvit_4, mean_yvit_5, mean_yvit_6)
+list_mean_zvit = c(mean_zvit_1, mean_zvit_2, mean_zvit_3, mean_zvit_4, mean_zvit_5, mean_zvit_6)
+
+
+
+my_data <- melt(data.frame(
+  cluster = c("1", "2", "3", "4", "5", "6"),
+  accel_x = list_mean_xacce,
+  accel_y = list_mean_yacce,
+  accel_z = list_mean_zacce,
+  vit_x = list_mean_xvit,
+  vit_y = list_mean_yvit,
+  vit_z = list_mean_zvit
+), variable_name = "variable")
+
+ggplot(my_data, aes(cluster, value, fill=variable)) +
+  geom_bar(position = "dodge", stat="identity", width=0.5)
+
+```
+
+```{r}
+# Vrais clusters
+
+# graphs pour le cluster 1
+index_pred_1 = which(labels %in% 1)
+mean_xacce_1 = mean(as.vector(ts_xacce[,index_pred_1]))
+mean_yacce_1 = mean(as.vector(ts_yacce[,index_pred_1]))
+mean_zacce_1 = mean(as.vector(ts_zacce[,index_pred_1]))
+
+mean_xvit_1 = mean(as.vector(ts_xvit[,index_pred_1]))
+mean_yvit_1 = mean(as.vector(ts_yvit[,index_pred_1]))
+mean_zvit_1 = mean(as.vector(ts_zvit[,index_pred_1]))
+
+# graphs pour le cluster 2
+index_pred_2 = which(labels %in% 2)
+mean_xacce_2 = mean(as.vector(ts_xacce[,index_pred_2]))
+mean_yacce_2 = mean(as.vector(ts_yacce[,index_pred_2]))
+mean_zacce_2 = mean(as.vector(ts_zacce[,index_pred_2]))
+
+mean_xvit_2 = mean(as.vector(ts_xvit[,index_pred_2]))
+mean_yvit_2 = mean(as.vector(ts_yvit[,index_pred_2]))
+mean_zvit_2 = mean(as.vector(ts_zvit[,index_pred_2]))
+
+# graphs pour le cluster 3
+index_pred_3 = which(labels %in% 3)
+mean_xacce_3 = mean(as.vector(ts_xacce[,index_pred_3]))
+mean_yacce_3 = mean(as.vector(ts_yacce[,index_pred_3]))
+mean_zacce_3 = mean(as.vector(ts_zacce[,index_pred_3]))
+
+mean_xvit_3 = mean(as.vector(ts_xvit[,index_pred_3]))
+mean_yvit_3 = mean(as.vector(ts_yvit[,index_pred_3]))
+mean_zvit_3 = mean(as.vector(ts_zvit[,index_pred_3]))
+
+# graphs po4r le cluster 4
+index_pred_4 = which(labels %in% 4)
+mean_xacce_4 = mean(as.vector(ts_xacce[,index_pred_4]))
+mean_yacce_4 = mean(as.vector(ts_yacce[,index_pred_4]))
+mean_zacce_4 = mean(as.vector(ts_zacce[,index_pred_4]))
+
+mean_xvit_4 = mean(as.vector(ts_xvit[,index_pred_4]))
+mean_yvit_4 = mean(as.vector(ts_yvit[,index_pred_4]))
+mean_zvit_4 = mean(as.vector(ts_zvit[,index_pred_4]))
+
+# graphs pour le cluster 5
+index_pred_5 = which(labels %in% 5)
+mean_xacce_5 = mean(as.vector(ts_xacce[,index_pred_5]))
+mean_yacce_5 = mean(as.vector(ts_yacce[,index_pred_5]))
+mean_zacce_5 = mean(as.vector(ts_zacce[,index_pred_5]))
+
+mean_xvit_5 = mean(as.vector(ts_xvit[,index_pred_5]))
+mean_yvit_5 = mean(as.vector(ts_yvit[,index_pred_5]))
+mean_zvit_5 = mean(as.vector(ts_zvit[,index_pred_5]))
+
+# graphs pour le cluster 6
+index_pred_6 = which(labels %in% 6)
+mean_xacce_6 = mean(as.vector(ts_xacce[,index_pred_6]))
+mean_yacce_6 = mean(as.vector(ts_yacce[,index_pred_6]))
+mean_zacce_6 = mean(as.vector(ts_zacce[,index_pred_6]))
+
+mean_xvit_6 = mean(as.vector(ts_xvit[,index_pred_6]))
+mean_yvit_6 = mean(as.vector(ts_yvit[,index_pred_6]))
+mean_zvit_6 = mean(as.vector(ts_zvit[,index_pred_6]))
+```
+
+```{r, fig.width = 15, fig.height=6}
+
+
+list_mean_xacce = c(mean_xacce_1, mean_xacce_2, mean_xacce_3, mean_xacce_4, mean_xacce_5, mean_xacce_6)
+list_mean_yacce = c(mean_yacce_1, mean_yacce_2, mean_yacce_3, mean_yacce_4, mean_yacce_5, mean_yacce_6)
+list_mean_zacce = c(mean_zacce_1, mean_zacce_2, mean_zacce_3, mean_zacce_4, mean_zacce_5, mean_zacce_6)
+list_mean_xvit = c(mean_xvit_1, mean_xvit_2, mean_xvit_3, mean_xvit_4, mean_xvit_5, mean_xvit_6)
+list_mean_yvit = c(mean_yvit_1, mean_yvit_2, mean_yvit_3, mean_yvit_4, mean_yvit_5, mean_yvit_6)
+list_mean_zvit = c(mean_zvit_1, mean_zvit_2, mean_zvit_3, mean_zvit_4, mean_zvit_5, mean_zvit_6)
+
+
+
+my_data <- melt(data.frame(
+  vrais_clusters = c("1", "2", "3", "4", "5", "6"),
+  accel_x = list_mean_xacce,
+  accel_y = list_mean_yacce,
+  accel_z = list_mean_zacce,
+  vit_x = list_mean_xvit,
+  vit_y = list_mean_yvit,
+  vit_z = list_mean_zvit
+), variable_name = "variable")
+
+ggplot(my_data, aes(vrais_clusters, value, fill=variable)) +
+  geom_bar(position = "dodge", stat="identity", width=0.5)
+
+```
+
+
+
+
+
+
+
+
+
